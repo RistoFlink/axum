@@ -11,6 +11,7 @@ use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get_service;
 use axum::{routing::get, Router};
 use serde::Deserialize;
+use tower_cookies::CookieManagerLayer;
 use tower_http::services::ServeDir;
 
 mod error;
@@ -22,7 +23,9 @@ async fn main() {
         .merge(routes_hello())
         .merge(web::routes_login::routes())
         .layer(middleware::map_response(main_response_mapper))
+        .layer(CookieManagerLayer::new())
         .fallback_service(routes_static()); //can't have overlapping routes ("/" in this case) - static routing used as a fallback
+                                            //the layers get executed from the bottom to the top!
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     println!("-> LISTENING on {addr}\n");
