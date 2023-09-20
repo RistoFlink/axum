@@ -29,12 +29,15 @@ async fn main() -> Result<()> {
     let routes_apis = web::routes_tickets::routes(mc.clone())
         .route_layer(middleware::from_fn(web::mw_auth::mw_require_auth));
 
-
     let routes_all: Router = Router::new()
         .merge(routes_hello())
         .merge(web::routes_login::routes())
         .nest("/api", routes_apis)
         .layer(middleware::map_response(main_response_mapper))
+        .layer(middleware::from_fn_with_state(
+            mc.clone(),
+            web::mw_auth::mw_ctx_resolver,
+        ))
         .layer(CookieManagerLayer::new())
         .fallback_service(routes_static()); //can't have overlapping routes ("/" in this case) - static routing used as a fallback
                                             //the layers get executed from the bottom to the top!
