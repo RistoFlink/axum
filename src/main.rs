@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use crate::log::log_request;
 use crate::model::ModelController;
 
 pub use self::error::{Error, Result};
@@ -8,10 +9,12 @@ use std::net::SocketAddr;
 use std::sync::mpsc::RecvTimeoutError;
 
 use axum::extract::{Path, Query};
+use axum::http::{Method, Uri};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get_service;
 use axum::{middleware, Json};
 use axum::{routing::get, Router};
+use ctx::Ctx;
 use serde::Deserialize;
 use serde_json::json;
 use tower_cookies::CookieManagerLayer;
@@ -20,6 +23,7 @@ use uuid::Uuid;
 
 mod ctx;
 mod error;
+mod log;
 mod model;
 mod web;
 
@@ -60,7 +64,12 @@ fn routes_hello() -> Router {
         .route("/hello/:name", get(handler_hello2))
 }
 
-async fn main_response_mapper(res: Response) -> Response {
+async fn main_response_mapper(
+    ctx: Option<Ctx>,
+    uri: Uri,
+    req_method: Method,
+    res: Response,
+) -> Response {
     println!("->> {:<12} - main_response_mapper", "RES_MAPPER");
     let uuid = Uuid::new_v4();
 
@@ -83,9 +92,8 @@ async fn main_response_mapper(res: Response) -> Response {
             //build the new response from the client_error_body
             (*status_code, Json(client_error_body)).into_response()
         });
-    println!("  --> server log line - {uuid} - Error: {service_error:?}");
-
-    println!();
+    let client_error = client_status_error.unzip().1;
+    log_request(uuid, req_method, uri, ctx, service_error, client_error).await;
     error_response.unwrap_or(res)
 }
 
